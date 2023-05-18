@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { Abi, ContractInterface, ProviderInterface } from 'starknet'
+import { Abi, ContractInterface, ProviderInterface, uint256 } from 'starknet'
 import { BlockNumber } from 'starknet'
 
 import { useStarknet } from '../providers'
 import { useContract } from './contract'
 import { useInvalidateOnBlock } from './invalidate'
+import { ABI_BALANCE_FRAGMENT, ETH_DECIMALS, ETH_ERC20 } from './balance'
 
 /** Contract Read options. */
 export interface UseContractReadOptions {
@@ -122,6 +123,88 @@ export function useContractRead<T extends unknown[]>({
 
   return {
     data,
+    error: error ?? undefined,
+    isIdle,
+    isLoading,
+    isFetching,
+    isSuccess,
+    isError,
+    isFetched,
+    isFetchedAfterMount,
+    isRefetching,
+    refetch,
+    status,
+  }
+}
+
+export interface UseBalanceArgs {
+  address?: string
+  token?: string
+  decimals?: number
+}
+
+export function useBalance({
+  address,
+  token,
+  decimals = ETH_DECIMALS,
+  watch = false,
+  blockIdentifier = 'pending',
+}: UseBalanceArgs & UseContractReadOptions) {
+  const contractAddress = token || ETH_ERC20
+  const functionName = 'balanceOf'
+  const args = [address]
+
+  const { library } = useStarknet()
+  const { contract } = useContract({ abi: ABI_BALANCE_FRAGMENT, address: contractAddress })
+
+  const queryKey_ = useMemo(
+    () =>
+      queryKey({
+        library,
+        args: { contract, functionName, args, blockIdentifier },
+      }),
+    [library, contract, address, blockIdentifier]
+  )
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const {
+    data,
+    error,
+    isStale: isIdle,
+    isLoading,
+    isFetching,
+    isSuccess,
+    isError,
+    isFetched,
+    isFetchedAfterMount,
+    isRefetching,
+    refetch,
+    status,
+  } = useQuery<any | undefined>(
+    queryKey_,
+    readContract({ args: { contract, functionName, args, blockIdentifier } })
+  )
+
+  useInvalidateOnBlock({ enabled: watch, queryKey: queryKey_ })
+
+  const parsedBalance = useMemo<string>(() => {
+    if (!data) return ''
+
+    if (!uint256.isUint256(data)) return ''
+
+    const asBN = uint256.uint256ToBN(data.balance)
+    const parsed = asBN.toString() / 10 ** decimals
+
+    console.log(data.balance)
+    console.log(asBN)
+    console.log(asBN.toString())
+
+    return parsed.toString()
+  }, [data])
+
+  return {
+    data,
+    balance: parsedBalance,
     error: error ?? undefined,
     isIdle,
     isLoading,
