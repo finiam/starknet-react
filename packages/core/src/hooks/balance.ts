@@ -18,4 +18,16 @@ export const ABI_BALANCE_FRAGMENT = [
     ],
     stateMutability: 'view',
   },
+  {
+    inputs: [],
+    name: 'symbol',
+    outputs: [
+      {
+        name: 'symbol',
+        type: 'felt',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ]

@@ -6,7 +6,7 @@ export type BlockExplorer = { name: string; url: string }
 /** Information about a StarkNet network. */
 export type Chain = {
   /** Chain ID. */
-  id: string
+  id: typeof constants.StarknetChainId[keyof typeof constants.StarknetChainId]
   /** Human-readable name. */
   name: string
   /** Block explorer. */
