@@ -16,22 +16,22 @@ export interface UseContractReadOptions {
 }
 
 /** Arguments for `useContractRead`. */
-export interface UseContractReadArgs<T extends unknown[]> {
+export interface UseContractReadArgs<TAbi extends ModAbi, TName extends string> {
   /** The target contract's ABI. */
-  abi: Abi
+  abi: TAbi
   /** The target contract's address. */
   address: string
   /** The contract's function name. */
-  functionName: string
+  functionName: TName & ExtractFunctionNames<TAbi>
   /** Read arguments. */
-  args?: T
+  args?: unknown[]
 }
 
 /** Value returned from `useContractRead`. */
-export interface UseContractReadResult {
+export interface UseContractReadResult<TAbi extends ModAbi, TName extends string> {
   /** Value returned from call. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data?: Array<any>
+  data?: FunctionReturnObject<TAbi, TName>
   /** Error when performing call. */
   error?: unknown
   isIdle: boolean
@@ -83,16 +83,48 @@ export interface UseContractReadResult {
  * }
  * ```
  */
-export function useContractRead<T extends unknown[]>({
+
+type AbiFunction = {
+  name: string
+  type: string
+  outputs: readonly {
+    name: string
+    type: string
+  }[]
+}
+type ModAbi = readonly (AbiFunction | any)[]
+
+type UnpackedArray<T> = T extends Array<infer U> ? U : T extends ReadonlyArray<infer U> ? U : T
+
+type ExtractFunctionOutput<TAbi extends ModAbi, name extends string> = Extract<
+  UnpackedArray<TAbi>,
+  { name: name }
+>['outputs']
+
+type ExtractFunctionNames<TAbi extends ModAbi> = Extract<
+  UnpackedArray<TAbi>,
+  { type: 'function'; stateMutability: 'view' }
+>['name']
+
+type ExtractFunctionOutputNames<TOutput extends AbiFunction['outputs']> = {
+  [K in keyof TOutput]: TOutput[K]['name']
+}
+
+type FunctionReturnObject<TAbi extends ModAbi, name extends string> = Record<
+  ExtractFunctionOutputNames<ExtractFunctionOutput<TAbi, name>>[number],
+  unknown
+>
+
+export function useContractRead<TAbi extends ModAbi, TName extends string>({
   abi,
   address,
   functionName,
   args,
   watch = false,
   blockIdentifier = 'pending',
-}: UseContractReadArgs<T> & UseContractReadOptions): UseContractReadResult {
+}: UseContractReadArgs<TAbi, TName> & UseContractReadOptions): UseContractReadResult<TAbi, TName> {
   const { library } = useStarknet()
-  const { contract } = useContract({ abi, address })
+  const { contract } = useContract({ abi, address } as any)
 
   const queryKey_ = useMemo(
     () => queryKey({ library, args: { contract, functionName, args, blockIdentifier } }),
